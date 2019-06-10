@@ -1,0 +1,63 @@
+---
+title: "Network visualization"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(igraph)
+```
+
+
+
+## Defining and visualizing graphs
+
+```{r}
+# Create graph with edges 1->2, 2->3 and 3->1
+g1 <- graph( edges=c(1,2, 2,3, 3, 1), n=3, directed=T)
+plot(g1)
+```
+
+
+## Creating graph from dataframe
+
+```{r}
+## Simple example dataframe
+relations <- data.frame(from=c("Bob", "Cecil", "Cecil", "David", "David", "Esmeralda"),
+                        to=c("Alice", "Bob", "Alice", "Alice", "Bob", "Alice"),
+                        same.dept=c(FALSE,FALSE,TRUE,FALSE,FALSE,TRUE),
+                        friendship=c(4,5,5,2,1,1),
+                        advice=c(4,5,5,4,2,3))
+relations
+```
+
+```{r}
+g <- graph.data.frame(relations, directed=TRUE, vertices=actors)
+print(g)
+```
+
+
+```{r}
+plot(g)
+```
+
+
+## Experimenting with layouts
+
+```{r}
+# Generate random network
+g <- sample_pa(100)
+
+# Set layouts for vertices (V) and edges (E)
+V(g)$size <- 8
+V(g)$frame.color <- "white"
+V(g)$color <- "orange"
+V(g)$label <- "" 
+E(g)$arrow.mode <- 0
+
+plot(g)
+```
+
