@@ -1,0 +1,50 @@
+---
+title: "LCA"
+author: "Dennis van den Berg"
+date: "12/9/2017"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library("poLCA")
+library("reshape2")
+library("plyr")
+library("dplyr")
+library("poLCA")
+library("ggplot2")
+library("ggparallel")
+library("igraph")
+library("tidyr")
+library("knitr")
+```
+
+```{r}
+# Load carcinoma data
+data(carcinoma)
+data <- carcinoma
+head(data, 10)
+```
+
+```{r}
+# Define relationship between response and predictor variables
+f <- cbind(A,B,C,D,E,F,G)~1
+
+# Apply Latent Class Analsysis
+lca3 <- poLCA(f, data, nclass = 3, graphs=TRUE)
+```
+
+
+```{r}
+# Iterate over number of classes and select model with lowest BIC
+max_II <- -100000
+min_bic <- 100000
+for(i in 2:10){
+  lc <- poLCA(f, data, nclass=i, maxiter=3000, tol=1e-5, na.rm=FALSE, nrep=10, verbose=FALSE, calc.se=TRUE)
+  if(lc$bic < min_bic){
+    min_bic <- lc$bic
+    LCA_best_model<-lc
+  }
+}    	
+LCA_best_model
+```
