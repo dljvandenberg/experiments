@@ -1,0 +1,29 @@
+---
+title: "EDA Tools"
+output: html_notebook
+---
+
+
+# Partial dependency plots using RF-SRC
+
+Fast Unified Random Forests for Survival, Regression and Classification (RF-SRC)
+
+
+```{r}
+library(ggRandomForests)
+
+rfsrc_iris <- rfsrc(Species ~., data = iris)
+partial_iris <- plot.variable(rfsrc_iris, partial=TRUE)
+```
+
+
+
+# Fun visualization: Waffle plots to visualize ratios
+
+```{r}
+install.packages('waffle')
+library(waffle)
+parts <- c(80, 30, 20, 10)
+waffle(parts, rows=8, title = 'Ratios')
+```
+
