@@ -176,3 +176,91 @@ The commands `st_buffer`, `st_boundary`, `st_convexhull`, `st_union_cascaded`, `
 Commands `st_intersection`, `st_union`, `st_difference`, `st_sym_difference` return new geometries that are a function of pairs of geometries.
 
 
+
+# tmap package
+
+Based on https://cran.r-project.org/web/packages/tmap/vignettes/tmap-getstarted.html
+
+```{r}
+library(tmap)
+data("World")
+```
+
+
+```{r}
+suppressMessages(tmap_mode("view"))
+
+tm_shape(World) +
+    tm_polygons("HPI")
+```
+
+
+```{r}
+data(World, metro, rivers, land)
+
+suppressMessages(tmap_mode("plot"))
+
+tm_shape(land) +
+    tm_raster("elevation", palette = terrain.colors(10)) +
+tm_shape(World) +
+    tm_borders("white", lwd = .5) +
+    tm_text("iso_a3", size = "AREA") +
+tm_shape(metro) +
+    tm_symbols(col = "red", size = "pop2020", scale = .5) +
+tm_legend(show = FALSE)
+```
+
+
+```{r}
+suppressMessages(tmap_mode("view"))
+tm_shape(World) +
+    tm_polygons(c("HPI", "economy")) +
+    tm_facets(sync = TRUE, ncol = 2)
+```
+
+```{r}
+suppressMessages(tmap_mode("plot"))
+
+data(NLD_muni)
+
+NLD_muni$perc_men <- NLD_muni$pop_men / NLD_muni$population * 100
+
+tm_shape(NLD_muni) +
+    tm_polygons("perc_men", palette = "RdYlBu") +
+    tm_facets(by = "province")
+```
+
+
+```{r}
+suppressMessages(tmap_mode("plot"))
+
+data(NLD_muni)
+tm1 <- tm_shape(NLD_muni) + tm_polygons("population", convert2density = TRUE)
+tm2 <- tm_shape(NLD_muni) + tm_bubbles(size = "population")
+
+tmap_arrange(tm1, tm2)
+```
+
+
+```{r}
+# Set alternative basemap (for available list, see: leaflet::providers)
+tm_basemap("Esri.WorldStreetMap") + tm_shape(metro) + tm_bubbles(size = "pop2020", col = "red")
+```
+
+
+```{r}
+tm_shape(World) +
+    tm_polygons("HPI") +
+tm_layout(bg.color = "skyblue", inner.margins = c(0, .02, .02, .02))
+```
+
+
+
+
+
+# References
+
+- https://www.r-spatial.org/r/2018/10/25/ggplot2-sf-2.html
+- https://cran.r-project.org/web/packages/sf/vignettes/sf1.html
+- https://cran.r-project.org/web/packages/tmap/vignettes/tmap-getstarted.html 
+- https://www.rspatial.org/
