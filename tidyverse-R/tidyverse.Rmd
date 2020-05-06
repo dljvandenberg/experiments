@@ -1,0 +1,106 @@
+---
+title: "Tidyverse experiments"
+output: html_notebook
+---
+
+
+```{r}
+library(tidyverse)
+```
+
+
+
+```{r}
+# 10000 experiments of correlation between 2 random vectors of length 10
+10000 %>%
+  rerun(x = rnorm(10), y = rnorm(10))%>%
+  map_dbl(~ cor(.x$x, .x$y)) %>% 
+  as_data_frame() %>% 
+  {ggplot(., aes(x = value)) + geom_histogram()}
+```
+
+
+# Partial
+
+```{r}
+my_long_variable <- 1:10
+plot2 <- partial(plot, my_long_variable)
+plot2()
+
+
+plot2(runif(10), type='l')
+```
+
+
+# Safely / possibly
+
+```{r}
+list("a", 10, 100) %>%
+  map_dbl(possibly(log, NA_real_))
+```
+
+
+
+# auto_browse for troubleshooting in case of errors
+
+```{r}
+f <- function(x) {
+  y <- 20
+  if (x > 5) {
+    stop("!")
+  } else {
+    x
+  }
+}
+
+#auto_browse(f(6))
+```
+
+
+# Mapping models to nested groups
+
+```{r}
+n_iris <- iris %>% 
+  group_by(Species) %>% 
+  nest()
+
+mod_fun <- function(df) {
+  lm(Sepal.Length ~ ., data = df)
+}
+  
+m_iris <- n_iris %>% 
+  mutate(model = map(data, mod_fun))
+
+b_fun <- function(model){
+  coefficients(model)[[1]]
+}
+
+m_iris %>% 
+  ungroup() %>% 
+  transmute(Species, beta = map_dbl(model, b_fun))
+```
+
+
+
+
+# Applying different lm models to subsets of data
+
+```{r}
+formulas <- list(
+  formula1 = Sepal.Length ~ Sepal.Width,
+  formula2 = Sepal.Length ~ Sepal.Width + Petal.Width,
+  formula3 = Sepal.Length ~ Sepal.Width + Petal.Width + Petal.Length
+)
+data <- split(iris, iris$Species)
+
+model_results <- crossing(formula = formulas, data) %>% 
+  mutate(trained_model = map2(.x = formula, .y = data, .f = lm)) %>% 
+  mutate(group = names(data)) %>% 
+  mutate(formula_text = as.character(formula)) %>% 
+  mutate(r2 = unlist(map(trained_model, ~ summary(.x)$r.squared))) %>% 
+  mutate(n = unlist(map(data, nrow)))
+model_results
+```
+
+
+
