@@ -1,0 +1,178 @@
+---
+title: "Process Mining using bupaR"
+author: "Dennis van den Berg"
+date: "7/3/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+#install.packages(c('bupaR', 'edeaR', 'processmapR', 'processmonitR'))
+library(tidyverse)
+library(bupaR)
+library(edeaR)
+library(processmapR)
+library(processmonitR)
+library(eventdataR)
+library(plotly)
+```
+
+
+# Data
+
+```{r}
+events <- eventdataR::patients
+events <- eventdataR::sepsis
+```
+
+
+# Explore
+
+```{r}
+summary(events)
+bupaR::activities(events)
+bupaR::cases(events)
+bupaR::resources(events)
+bupaR::traces(events)
+```
+
+
+
+```{r}
+events %>% 
+  edeaR::activity_frequency(level = "activity") %>% 
+  plot()
+```
+
+
+```{r}
+events %>% 
+  edeaR::number_of_repetitions(level = "activity") %>% 
+  plot()
+```
+
+```{r}
+events %>% 
+  edeaR::start_activities(level = 'activity') %>% 
+  plot()
+```
+
+```{r}
+events %>% 
+  edeaR::end_activities(level = 'activity') %>% 
+  plot()
+```
+
+
+```{r}
+events %>% 
+  edeaR::throughput_time(level = 'case') %>% 
+  plot()
+```
+
+
+```{r}
+events %>% 
+  edeaR::resource_involvement(level = 'case') %>%
+  plot()
+```
+
+
+
+```{r}
+events %>% 
+  edeaR::resource_specialisation(level = 'activity') %>% 
+  plot()
+```
+
+  
+```{r fig.width=10}
+events %>% 
+  edeaR::trace_coverage(level = 'trace') %>% 
+  arrange(desc(absolute)) %>% 
+  head(10) %>% 
+  {ggplot(., aes(x = reorder(trace, absolute), y = absolute)) +
+      geom_col(aes(fill = absolute)) +
+      xlab('trace') +
+      ylab('trace frequency') +
+      theme(legend.position = 'none') +
+      coord_flip()}
+```
+  
+
+```{r}
+events %>%
+  edeaR::filter_activity_frequency(percentage = 1.0) %>% 
+  edeaR::filter_trace_frequency(percentage = .80) %>%    
+  processmapR::process_map(render = T)
+```
+
+
+```{r}
+events %>%
+  filter_activity_frequency(percentage = 1.0) %>% 
+  filter_trace_frequency(percentage = .80) %>%    
+  processmapR::precedence_matrix() %>% 
+  plot()
+```
+
+
+
+```{r}
+events %>%
+  edeaR::filter_time_period(interval = c(ymd('2015-01-01'), ymd('2021-01-01')), filter_method = 'start') %>%
+  processmapR::trace_explorer()
+```
+
+
+```{r}
+events %>% 
+  processmapR::plotly_dotted_chart()
+```
+
+
+
+```{r}
+events %>% 
+  edeaR::filter_time_period(interval = c(ymd('2015-02-01'), ymd('2021-01-01')), filter_method = 'start') %>%
+  processmapR::resource_map()
+```
+
+
+
+```{r}
+events %>% 
+  edeaR::filter_time_period(interval = c(ymd('2015-01-01'), ymd('2021-01-01')), filter_method = 'start') %>%
+  processmapR::plotly_dotted_chart()
+```
+
+```{r}
+# events %>% 
+#   processmapR::resource_matrix() %>% 
+#   plot()
+```
+
+
+```{r}
+events %>% 
+  processmonitR::activity_dashboard()
+```
+
+```{r}
+# Many components not working for eventdataR::sepsis dataset
+events %>% 
+  processmonitR::performance_dashboard()
+```
+
+
+```{r}
+events %>% 
+  processmonitR::resource_dashboard()
+```
+
+```{r}
+events %>% 
+  processmonitR::rework_dashboard()
+```
+
