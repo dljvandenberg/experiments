@@ -35,7 +35,7 @@ relations
 ```
 
 ```{r}
-g <- graph.data.frame(relations, directed=TRUE, vertices=actors)
+g <- graph.data.frame(relations, directed=TRUE)
 print(g)
 ```
 
