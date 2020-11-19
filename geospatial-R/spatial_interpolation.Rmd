@@ -239,15 +239,15 @@ f.1 <- as.formula(Precip_in ~ X + Y)
 # Compute the sample variogram; note that the f.1 trend model is one of the
 # parameters passed to variogram(). This tells the function to create the 
 # variogram on the de-trended data.
-var.smpl <- variogram(f.1, P, cloud = FALSE, cutoff=1000000, width=89900)
+var.smpl <- variogram(f.1, P, cloud = FALSE, cutoff=4000000, width=89900)
 
 # Compute the variogram model by passing the nugget, sill and range values
 # to fit.variogram() via the vgm() function.
-dat.fit  <- fit.variogram(var.smpl, fit.ranges = FALSE, fit.sills = FALSE,
-                          vgm(psill=14, model="Sph", range=590000, nugget=0))
+dat.fit  <- fit.variogram(var.smpl, fit.ranges = TRUE, fit.sills = TRUE,
+                          vgm(model="Sph"))
 
 # The following plot allows us to assess the fit
-plot(var.smpl, dat.fit, xlim=c(0,1000000))
+plot(var.smpl, dat.fit, xlim=c(0,2000000))
 ```
 
 

@@ -1,0 +1,97 @@
+---
+title: "Visualize height profile along line segment"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+In dit notebook wordt de preprocessing van de rasterbestanden uitgewerkt en een dwarsdoorsnede van het hoogteprofiel gegenereerd.
+```{r}
+library(tidyverse)
+library(sf)
+library(plotly)
+```
+
+
+# Data inlezen
+
+```{r}
+# Raster met AHN hoogte
+rasterfile <- read_rds("ahn_raster_stuwvak_107P15.rds")
+
+# Peelkanaal waterloop
+waterlopen <- st_read("waterlopen/A_waterlopen.shp", quiet = TRUE)
+
+waterloop <- waterlopen %>% 
+  st_transform(28992) %>% 
+  filter(CODE == "114061")
+```
+
+
+# Preprocessing: ordenen waterloop punten, afstanden en hoogte toevoegen
+
+```{r}
+# Radius rondom elk punt, op basis waarvan de median hoogte van omringende gebiedje wordt bepaald
+buffer_afstand <- 30
+
+
+# Ordenen waterloop punten
+waterloop_geordend <- waterloop %>% 
+  st_line_merge() %>% 
+  st_cast(to = "POINT") %>% 
+  mutate(volgorde = row_number())
+
+# Geometrieen van vorige punten apart bepalen (aangezien dit binnen dplyr::mutate() een error oplevert)
+geometries_vorige_punten <- lag(waterloop_geordend$geometry)
+geometries_vorige_punten[[1]] <- waterloop_geordend$geometry[[1]]
+# Toevoegen afstanden gemeten langs waterloop (zowel tussen punten als cumulatief, dwz vanaf beginpunt)
+waterloop_geordend <- waterloop_geordend %>% 
+  mutate(afstand_vorige_punt = as.numeric(st_distance(geometry, geometries_vorige_punten, by_element = TRUE))) %>% 
+  mutate(afstand_vanaf_start = cumsum(afstand_vorige_punt))
+
+# Raster uitsnijden en hoogte toevoegen
+sf_hoogte_vs_afstand <- raster::mask(rasterfile, st_buffer(waterloop, buffer_afstand)) %>% 
+  raster::rasterToPoints() %>% 
+  as.data.frame() %>% 
+  st_as_sf(coords = c("x", "y"), dim = "XYZ", crs = 28992) %>% 
+  st_intersection(st_buffer(waterloop_geordend, buffer_afstand)) %>% 
+  group_by(afstand_vanaf_start) %>% 
+  summarise(hoogte = median(layer))
+```
+
+
+# Plot op kaart
+
+```{r}
+# Gehele waterloop
+waterloop_geordend %>% 
+  {ggplot(.) +
+      geom_sf(aes(color = afstand_vanaf_start)) +
+      geom_sf(data = waterloop, color = 'red') +
+      ggtitle('Gehele waterloop')} %>% 
+  ggplotly()
+```
+
+
+```{r}
+# Waterloop binnen stuwvak
+ggplot(sf_hoogte_vs_afstand) +
+  geom_sf(aes(color = hoogte)) +
+  ggtitle('Waterloop binnen stuwvak')
+```
+
+
+```{r}
+# Hoogteprofiel
+{ggplot(sf_hoogte_vs_afstand, aes(x = afstand_vanaf_start, y = hoogte)) +
+    #geom_line(size = 0.1) +
+    geom_point(size = .1) +
+    geom_smooth(span = 0.1, se = FALSE) +
+    ggtitle('Hoogteprofiel')} %>% 
+ggplotly()
+```
+
+
+

@@ -1,6 +1,6 @@
 ---
 title: "Geospatial plots"
-output: html_notebook
+output: html_document
 ---
 
 Code based on example from: https://www.r-spatial.org/r/2018/10/25/ggplot2-sf-2.html
@@ -151,7 +151,7 @@ st_linestring(matrix(10:1,5))
 
 ```{r}
 # Convert to standard feature
-st_as_sf()
+#st_as_sf()
 ```
 
 
@@ -166,7 +166,7 @@ nc.web_mercator <- st_transform(nc, 3857)
 
 ```{r}
 # Distance between geometries
-st_distance(x[c(1,4,22),], x[c(1, 33,55,56),])
+#st_distance()
 ```
 
 The commands `st_intersects`, `st_disjoint`, `st_touches`, `st_crosses`, `st_within`, `st_contains`, `st_overlaps`, `st_equals`, `st_covers`, `st_covered_by`, `st_equals_exact` and `st_is_within_distance` return a sparse matrix with matching (TRUE) indexes, or a full logical matrix.
