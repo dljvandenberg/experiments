@@ -1,0 +1,81 @@
+---
+title: "Time Series using Tidyverts"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+NOTE: Loading the `fable` package gives error during loading for me:
+
+```
+Show in New WindowClear OutputExpand/Collapse Output
+Error: package or namespace load failed for ‘fable’ in dyn.load(file, DLLpath = DLLpath, ...): unable to load shared object '/Library/Frameworks/R.framework/Versions/3.6/Resources/library/fable/libs/fable.so': dlopen(/Library/Frameworks/R.framework/Versions/3.6/Resources/library/fable/libs/fable.so, 6): Library not loaded: /usr/local/lib/libgfortran.2.dylib Referenced from: /Library/Frameworks/R.framework/Versions/3.6/Resources/library/fable/libs/fable.so Reason: image not found
+```
+
+
+## Prep
+
+```{r}
+# install.packages("devtools")
+# install.packages("tidyverse")
+# install.packages("tsibble")
+# install.packages("tsibbledata")
+# install.packages("fabletools")
+# install.packages("RcppArmadillo")
+# install.packages('nycflights13')
+# install.packages("fable")
+# install.packages("feasts")
+# install.packages("urca")
+
+library(tidyverse)
+library(fable)
+library(tsibble)
+library(tsibbledata)
+library(lubridate)
+library(feasts)
+library(urca)
+```
+
+
+
+## Tidyverts functionality
+
+```{r}
+UKLungDeaths <- as_tsibble(cbind(mdeaths, fdeaths), pivot_longer = FALSE)
+```
+
+
+
+## tsibble
+
+```{r}
+weather <- nycflights13::weather %>% 
+  select(origin, time_hour, temp, humid, precip)
+weather
+```
+
+
+```{r}
+weather_tsbl <- as_tsibble(weather, key = vctrs::vec_group_id(origin))
+```
+
+
+
+## fable
+
+```{r}
+aus_retail %>%
+  filter(
+    State %in% c("New South Wales", "Victoria"),
+    Industry == "Department stores"
+  ) %>% 
+  model(
+    ets = ETS(box_cox(Turnover, 0.3)),
+    arima = ARIMA(log(Turnover)),
+    snaive = SNAIVE(Turnover)
+  ) %>%
+  forecast(h = "2 years") %>% 
+  autoplot(filter(aus_retail, year(Month) > 2010), level = NULL)
+```
