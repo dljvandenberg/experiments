@@ -1,6 +1,6 @@
 ---
 title: "Tidyverse experiments"
-output: html_notebook
+output: html_document
 ---
 
 
