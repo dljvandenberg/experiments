@@ -1,0 +1,9 @@
+jupyter
+numpy
+pandas
+scipy
+matplotlib
+arviz
+pymc3
+jupyter_contrib_nbextensions
+
