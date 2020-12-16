@@ -1,0 +1,292 @@
+---
+title: "Assignment"
+author: "Dennis van den Berg"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning=FALSE)
+
+library(tidyverse)
+library(lubridate)
+library(plotly)
+library(lme4)
+
+
+## SETTINGS
+
+data_file <- '../data/DataEngieCasus2.csv'
+
+# Set max valid pressure for data cleaning/validation purposes
+max_valid_pressure <- 10000
+
+
+## FUNCTIONS
+
+# Read data from file
+get_data <- function(file){
+  df <- readr::read_delim(data_file, delim = ';', locale = locale(decimal_mark = ','))
+  return(df)
+}
+
+
+# Typesetting, renaming, add data/hour columns, remove NA and outliers
+preprocess_data <- function(df, max_valid_pressure = 10000){
+  
+  df_clean <- df %>% 
+    # Hacky fix for incorrect datetime format string ;)
+    mutate(timestamp = stringr::str_replace(string = timestamp, pattern = '2020-15-10', replacement = '2020-10-15')) %>% 
+    mutate(timestamp = ymd_hm(timestamp)) %>% 
+    mutate(date = date(timestamp),
+           hour = hour(timestamp)) %>% 
+    rename(pressure = value) %>% 
+    # Filter out NA values and pressure outliers
+    filter(!is.na(pressure)) %>% 
+    filter(pressure < max_valid_pressure) %>% 
+    arrange(timestamp)
+  
+  return(df_clean)
+}
+```
+
+
+# VRAAGSTELLING
+
+Als ENGIE beheren we een installatie waar helaas een technische fout is ingeslopen. Het gevolg is dat de druk in de installatie sterk kan oplopen. Om te voorkomen dat er gevaarlijke situaties ontstaan, hebben de installatietechnici een snelle oplossing bedacht: ’s nachts zet iemand handmatig een klep open waardoor de overdruk kan ontsnappen. Een mooie tijdelijke oplossing, maar liever nog liggen ze ’s nachts gewoon te slapen. In een discussie over de mogelijke oorzaken, gaf een van de experts aan het gevoel te hebben dat de toename van de druk niet altijd hetzelfde patroon volgt. “Het lijkt wel alsof de installatie goede en slechte dagen heeft”. De vragen waar ze mee naar jou toe zijn gekomen zijn de volgende: [in het grijs staan de tips die je van een collega krijgt en we graag hebben dat je toepast] 
+
+1.	Kun jij op basis van de data het gevoel van de expert bevestigen?  
+a.	Pas een mixed effect model toe. Je kunt daarbij bijvoorbeeld de lmer function uit het R-pakket lme4 gebruiken (of een vergelijkbaar pakket indien je in Python werkt). De functie krijgt dan bijvoorbeeld de vorm: myModel <- lmer(druk ~ tijd + (tijd | groupID) , data = myData).
+2.	Als het gevoel inderdaad bevestigd kan worden, kun je de verschillende dagen automatisch `	herkennen?  
+a.	Gebruik de intercepten en/of slope (aan jou de keuze) uit vraag 1 als input voor een k-means om unsupervised een classificatie te maken. Sla deze op in een myKmeansModel object.  
+b.	Plot een grafiek waarin je duidelijk ziet dat je de clustering goed hebt toegepast.  
+3.	Zou je dan op basis van een paar uren van een nieuwe dag kunnen vaststellen of het een ‘goede’ of ‘slechte’ dag gaat zijn voor de installatie?  
+a.	Schrijf een functie waarmee je op basis van een beperkte set aan datapunten de intercept en/of slope bepaalt.  
+b.	K-means kent (in R) geen predict function, dus schrijf een functie die op basis van de intercept en/of slope en het myKmeansModel object de bijbehorende cluster bepaalt.  
+
+
+
+# Data exploratie
+
+De installatietechnicus heeft een datadump voor je gemaakt (in csv formaat) van de afgelopen 29 dagen. De data bevat een tijdstempel en de druk. Hij heeft de data heel even geopend op zijn laptop om te kijken of alles klopte, maar dat lukte hem niet helemaal. Maar volgens hem moet het kloppen, want toen hij in zijn systeem keek, zag de grafiek er mooi uit (printscreen). Deze installatie draait overigens continu; je hoeft niet te kijken naar verschillen tussen de verschillende dagen van de week.  
+
+```{r}
+df_pressure <- get_data(data_file) %>% 
+  preprocess_data(max_valid_pressure = 10000)
+```
+
+
+
+# EXPLORE
+
+```{r}
+summary(df_pressure)
+```
+We kijken naar data van 1 t/m 29 oktober 2020, een kleine maand aan data.
+
+
+```{r}
+df_pressure %>% 
+  {ggplot(., aes(x = timestamp, y = pressure)) +
+      geom_point(size = 0.2) +
+      geom_line() +
+      ggtitle('Pressure over time')}
+```
+
+In de bovenstaande timeseries plot valt al op dat het gedrag per dag sterk kan verschillen.
+
+Een simpele exploratie laat een verduidelijking van het dagelijkse gedrag zien, als we de data kleuren adhv de dagelijkse maximumdruk:
+
+```{r}
+df_pressure %>% 
+  group_by(date) %>% 
+  mutate(daily_max_pressure = max(pressure)) %>% 
+  {ggplot(., aes(x = timestamp, y = pressure, group = date)) +
+      geom_line(aes(color = daily_max_pressure)) +
+      scale_color_gradient(low = 'green', high = 'red') +
+      ggtitle('Pressure over time - colored by max daily pressure')} %>% 
+  ggplotly()
+```
+
+
+Plotten we het dagelijkse drukverloop per uur van de dag, met y as op log schaal, dan wordt dit patroon steeds duidelijker:
+
+```{r}
+df_pressure %>% 
+  group_by(date) %>% 
+  mutate(daily_max_pressure = max(pressure)) %>% 
+  {ggplot(., aes(x = hour, y = pressure, color = daily_max_pressure, group = date)) +
+      geom_point(size = 0.2) +
+      geom_line(size = 0.1) +
+      scale_y_log10() +
+      scale_color_gradient(low = 'green', high = 'red') +
+      ggtitle('Pressure increase per day - log scale - colored by daily_max_pressure')} %>% 
+  ggplotly()
+```
+Deze korte exploratie doet ons vermoeden dat er elke dag een exponentiele druktoename is, waarbij de mate van toename per dag lijkt te verschillen.
+
+Op 'slechte' dagen lijkt de druk vaak zelfs lager dan gemiddeld te beginnen, terwijl hij bovengemiddeld hoog eindigt (hetgeen bevestigd wordt door onderstaande druk-histogrammen op verschillende uren van de dag).
+
+```{r}
+df_pressure %>% 
+  group_by(date) %>% 
+  mutate(daily_max_pressure = max(pressure)) %>% 
+  filter(hour %in% c(0, 6, 12, 18, 23)) %>% 
+  {ggplot(., aes(x = pressure, group = date)) +
+      geom_histogram(aes(fill = daily_max_pressure)) +
+      scale_fill_gradient(low = 'green', high = 'red') +
+      facet_wrap('hour', scales = 'free_x', labeller = label_both) +
+      ggtitle('Histograms of pressure at different hours of day')}
+```
+
+
+
+
+# Analyse
+
+We passen een mixed effect model toe:
+
+```{r}
+# (pressuremodel_linear <- lmer(pressure ~ hour + (hour | date), data = df_pressure))
+```
+
+
+```{r}
+# Een lineair model geeft problematische residuals (onderschatting voor alle lage waarden en de heel hoge waarden).
+# plot(pressuremodel_linear)
+```
+
+
+
+```{r}
+(pressuremodel_loglinear <- lmer(log(pressure) ~ hour + (hour | date), data = df_pressure))
+```
+```{r}
+plot(pressuremodel_loglinear)
+```
+
+Dubbelchecken van de risiduals laat zien dat het log-lineair model een veel nettere fit geeft dan het eerder onderzochte lineaire model.
+
+
+## Coefficienten per dag
+
+We bepalen de intercepts en slopes per dag uit het log-lineaire model:
+
+```{r}
+coefficients_loglinear <- coef(pressuremodel_loglinear)$date %>% 
+  rename(intercept = `(Intercept)`,
+         slope = hour) %>% 
+  rownames_to_column(var = 'date')
+
+coefficients_loglinear %>% 
+  head() %>% 
+  DT::datatable()
+```
+
+En plotten intercept vs slope:
+ 
+```{r}
+
+coefficients_loglinear %>% 
+  {ggplot(., aes(x = slope, y = intercept, color = date)) +
+      geom_point() +
+      ggtitle('Fit coefficienten per dag') +
+      annotate("text", x = .2, y = .42, label = "Lage begindruk, sterke stijging") +
+      annotate("text", x = .1, y = .7, label = "Hoge begindruk, matige stijging")
+      } %>% 
+  ggplotly()
+```
+Conclusie: er zijn duidelijk 2 niet-overlappende clusters te onderscheiden van 'goede' en 'slechte' dagen:
+
+- 'Goede' dagen: cluster van dagen met hoge begindruk (intercept) en matige stijging (slope)
+- 'Slechte' dagen: cluster van dagen met lage begindruk en sterke stijging
+
+
+
+# Clustering
+
+We clusteren de coefficient-data mbv een k-means algoritme:
+
+```{r}
+model_kmeans <- coefficients_loglinear %>% 
+  select(-date) %>% 
+  #scale() %>% 
+  kmeans(., centers = 2)
+model_kmeans
+```
+
+```{r}
+# Cluster id's toevoegen aan coefficient data
+coefficients_loglinear <- coefficients_loglinear %>% 
+  mutate(cluster = factor(model_kmeans$cluster))
+```
+
+```{r}
+coefficients_loglinear %>% 
+  {ggplot(., aes(x = slope, y = intercept, color = cluster)) +
+      geom_point() +
+      ggtitle('Fit coefficienten per dag - geclusterd mbv k-means') +
+      annotate("text", x = .2, y = .42, label = "Lage begindruk, sterke stijging") +
+      annotate("text", x = .1, y = .7, label = "Hoge begindruk, matige stijging")
+      } %>% 
+  ggplotly()
+```
+
+
+# Voorspellingen adhv beperkte dag-data
+
+```{r}
+# Calculates intercept and slope coefficients of log-linear model fitted on newdata of single day
+# Returns list(intercept, slope)
+get_coefficients_loglinear <- function(newdata){
+  
+  # Fit log-linear model on newdata
+  model_loglinear <- lm(log(pressure) ~ hour, data = newdata)
+  
+  # Get coefficients, i.e. intercept and slope (per day)
+  coefficients_loglinear <- model_loglinear$coefficients
+  names(coefficients_loglinear) <- c('intercept', 'slope')
+  
+  return(coefficients_loglinear)
+}
+
+
+
+# Predict cluster based on coefficients and trained k-means clustering model
+predict_cluster <- function(coefficients, kmeansmodel){
+  
+  # Get cluster centers
+  cluster_centers <- kmeansmodel$centers
+  
+  # Calculate distance to cluster_centers
+  
+  
+  # Determine cluster id based on closest cluster center
+  
+  return(cluster_centers)
+}
+```
+
+
+```{r}
+# Use 2020-10-03 data as testdata to predict cluster
+df_test <- get_data(data_file) %>% 
+  filter(date(ymd_hm(timestamp)) == ymd('2020-10-03')) %>% 
+  preprocess_data()
+
+(coefficients <- get_coefficients_loglinear(newdata = df_test))
+
+(predicted_cluster <- predict_cluster(coefficients = coefficients, kmeansmodel = model_kmeans))
+
+# Test
+#assertthat::assert_that(predicted_cluster == 1, msg = "Predicted cluster should be 1")
+```
+
+```{r}
+coefficients
+(cluster_centers <- model_kmeans$centers)
+```
+
+```{r}
+factoextra::get_dist(cluster_centers, method = 'euclidean')
+```
+
