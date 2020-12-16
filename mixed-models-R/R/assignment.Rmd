@@ -5,7 +5,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning=FALSE)
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
 
 library(tidyverse)
 library(lubridate)
@@ -50,7 +50,7 @@ preprocess_data <- function(df, max_valid_pressure = 10000){
 ```
 
 
-# VRAAGSTELLING
+# Vraagstelling
 
 Als ENGIE beheren we een installatie waar helaas een technische fout is ingeslopen. Het gevolg is dat de druk in de installatie sterk kan oplopen. Om te voorkomen dat er gevaarlijke situaties ontstaan, hebben de installatietechnici een snelle oplossing bedacht: ’s nachts zet iemand handmatig een klep open waardoor de overdruk kan ontsnappen. Een mooie tijdelijke oplossing, maar liever nog liggen ze ’s nachts gewoon te slapen. In een discussie over de mogelijke oorzaken, gaf een van de experts aan het gevoel te hebben dat de toename van de druk niet altijd hetzelfde patroon volgt. “Het lijkt wel alsof de installatie goede en slechte dagen heeft”. De vragen waar ze mee naar jou toe zijn gekomen zijn de volgende: [in het grijs staan de tips die je van een collega krijgt en we graag hebben dat je toepast] 
 
@@ -74,9 +74,6 @@ df_pressure <- get_data(data_file) %>%
   preprocess_data(max_valid_pressure = 10000)
 ```
 
-
-
-# EXPLORE
 
 ```{r}
 summary(df_pressure)
@@ -195,7 +192,7 @@ coefficients_loglinear %>%
       } %>% 
   ggplotly()
 ```
-Conclusie: er zijn duidelijk 2 niet-overlappende clusters te onderscheiden van 'goede' en 'slechte' dagen:
+**Conclusie: er zijn duidelijk 2 niet-overlappende clusters te onderscheiden van 'goede' en 'slechte' dagen:**
 
 - 'Goede' dagen: cluster van dagen met hoge begindruk (intercept) en matige stijging (slope)
 - 'Slechte' dagen: cluster van dagen met lage begindruk en sterke stijging
@@ -218,9 +215,8 @@ model_kmeans
 # Cluster id's toevoegen aan coefficient data
 coefficients_loglinear <- coefficients_loglinear %>% 
   mutate(cluster = factor(model_kmeans$cluster))
-```
 
-```{r}
+# Plot adhv k-means cluster
 coefficients_loglinear %>% 
   {ggplot(., aes(x = slope, y = intercept, color = cluster)) +
       geom_point() +
@@ -236,7 +232,7 @@ coefficients_loglinear %>%
 
 ```{r}
 # Calculates intercept and slope coefficients of log-linear model fitted on newdata of single day
-# Returns list(intercept, slope)
+# Returns array with intercept and slope
 get_coefficients_loglinear <- function(newdata){
   
   # Fit log-linear model on newdata
@@ -246,7 +242,7 @@ get_coefficients_loglinear <- function(newdata){
   coefficients_loglinear <- model_loglinear$coefficients
   names(coefficients_loglinear) <- c('intercept', 'slope')
   
-  return(coefficients_loglinear)
+  return(as.array(coefficients_loglinear))
 }
 
 
@@ -257,12 +253,13 @@ predict_cluster <- function(coefficients, kmeansmodel){
   # Get cluster centers
   cluster_centers <- kmeansmodel$centers
   
-  # Calculate distance to cluster_centers
-  
+  # Calculate distances to cluster_centers
+  distances <- factoextra::get_dist(rbind(cluster_centers, coefficients), method = 'euclidean')[-1]
   
   # Determine cluster id based on closest cluster center
+  closest_cluster_id <- which.min(distances)
   
-  return(cluster_centers)
+  return(closest_cluster_id)
 }
 ```
 
@@ -276,17 +273,4 @@ df_test <- get_data(data_file) %>%
 (coefficients <- get_coefficients_loglinear(newdata = df_test))
 
 (predicted_cluster <- predict_cluster(coefficients = coefficients, kmeansmodel = model_kmeans))
-
-# Test
-#assertthat::assert_that(predicted_cluster == 1, msg = "Predicted cluster should be 1")
 ```
-
-```{r}
-coefficients
-(cluster_centers <- model_kmeans$centers)
-```
-
-```{r}
-factoextra::get_dist(cluster_centers, method = 'euclidean')
-```
-
