@@ -1,5 +1,5 @@
 ---
-title: "Assignment"
+title: "ENGIE Assignment"
 author: "Dennis van den Berg"
 output: html_document
 ---
@@ -153,6 +153,7 @@ We passen een mixed effect model toe:
 
 ```{r}
 (pressuremodel_loglinear <- lmer(log(pressure) ~ hour + (hour | date), data = df_pressure))
+# summary(pressuremodel_loglinear)
 ```
 ```{r}
 plot(pressuremodel_loglinear)
@@ -204,19 +205,21 @@ We clusteren de coefficient-data mbv een k-means algoritme:
 model_kmeans <- coefficients_loglinear %>% 
   select(-date) %>% 
   #scale() %>% 
-  kmeans(., centers = 2)
+  kmeans(., centers = 2, nstart = 10)
 model_kmeans
 ```
+
 
 ```{r}
 # Cluster id's toevoegen aan coefficient data
 coefficients_loglinear <- coefficients_loglinear %>% 
   mutate(cluster = factor(model_kmeans$cluster))
 
-# Plot adhv k-means cluster
+# Plot adhv k-means cluster, incl centroids
 coefficients_loglinear %>% 
-  {ggplot(., aes(x = slope, y = intercept, color = cluster)) +
-      geom_point() +
+  {ggplot(., aes(x = slope, y = intercept)) +
+      geom_point(aes(color = cluster)) +
+      geom_point(data = as.data.frame(model_kmeans$centers), aes(x = slope, y = intercept), shape = 3) +
       ggtitle('Fit coefficienten per dag - geclusterd mbv k-means') +
       annotate("text", x = .2, y = .42, label = "Lage begindruk, sterke stijging") +
       annotate("text", x = .1, y = .7, label = "Hoge begindruk, matige stijging")
