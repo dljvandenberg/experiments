@@ -52,16 +52,13 @@ preprocess_data <- function(df, max_valid_pressure = 10000){
 
 # Vraagstelling
 
-Als ENGIE beheren we een installatie waar helaas een technische fout is ingeslopen. Het gevolg is dat de druk in de installatie sterk kan oplopen. Om te voorkomen dat er gevaarlijke situaties ontstaan, hebben de installatietechnici een snelle oplossing bedacht: ’s nachts zet iemand handmatig een klep open waardoor de overdruk kan ontsnappen. Een mooie tijdelijke oplossing, maar liever nog liggen ze ’s nachts gewoon te slapen. In een discussie over de mogelijke oorzaken, gaf een van de experts aan het gevoel te hebben dat de toename van de druk niet altijd hetzelfde patroon volgt. “Het lijkt wel alsof de installatie goede en slechte dagen heeft”. De vragen waar ze mee naar jou toe zijn gekomen zijn de volgende: [in het grijs staan de tips die je van een collega krijgt en we graag hebben dat je toepast] 
+Als ENGIE beheren we een installatie waar helaas een technische fout is ingeslopen. Het gevolg is dat de druk in de installatie sterk kan oplopen. Om te voorkomen dat er gevaarlijke situaties ontstaan, hebben de installatietechnici een snelle oplossing bedacht: ’s nachts zet iemand handmatig een klep open waardoor de overdruk kan ontsnappen. Een mooie tijdelijke oplossing, maar liever nog liggen ze ’s nachts gewoon te slapen.
 
-1.	Kun jij op basis van de data het gevoel van de expert bevestigen?  
-a.	Pas een mixed effect model toe. Je kunt daarbij bijvoorbeeld de lmer function uit het R-pakket lme4 gebruiken (of een vergelijkbaar pakket indien je in Python werkt). De functie krijgt dan bijvoorbeeld de vorm: myModel <- lmer(druk ~ tijd + (tijd | groupID) , data = myData).
+In een discussie over de mogelijke oorzaken, gaf een van de experts aan het gevoel te hebben dat de toename van de druk niet altijd hetzelfde patroon volgt. “Het lijkt wel alsof de installatie goede en slechte dagen heeft”. De vragen waar ze mee naar jou toe zijn gekomen zijn de volgende:
+
+1.	Kun jij op basis van de data het gevoel van de expert bevestigen?
 2.	Als het gevoel inderdaad bevestigd kan worden, kun je de verschillende dagen automatisch `	herkennen?  
-a.	Gebruik de intercepten en/of slope (aan jou de keuze) uit vraag 1 als input voor een k-means om unsupervised een classificatie te maken. Sla deze op in een myKmeansModel object.  
-b.	Plot een grafiek waarin je duidelijk ziet dat je de clustering goed hebt toegepast.  
 3.	Zou je dan op basis van een paar uren van een nieuwe dag kunnen vaststellen of het een ‘goede’ of ‘slechte’ dag gaat zijn voor de installatie?  
-a.	Schrijf een functie waarmee je op basis van een beperkte set aan datapunten de intercept en/of slope bepaalt.  
-b.	K-means kent (in R) geen predict function, dus schrijf een functie die op basis van de intercept en/of slope en het myKmeansModel object de bijbehorende cluster bepaalt.  
 
 
 
@@ -231,6 +228,8 @@ coefficients_loglinear %>%
 # Voorspellingen adhv beperkte dag-data
 
 ```{r}
+## DEFINE ADDITIONAL FUNCTIONS
+
 # Calculates intercept and slope coefficients of log-linear model fitted on newdata of single day
 # Returns array with intercept and slope
 get_coefficients_loglinear <- function(newdata){
@@ -264,13 +263,35 @@ predict_cluster <- function(coefficients, kmeansmodel){
 ```
 
 
+Als test-data kiezen we voor nu de data van 3 okt 2020 (onvolledige dag met slechts 5 datapunten):
+
 ```{r}
 # Use 2020-10-03 data as testdata to predict cluster
 df_test <- get_data(data_file) %>% 
   filter(date(ymd_hm(timestamp)) == ymd('2020-10-03')) %>% 
   preprocess_data()
+df_test %>% 
+  DT::datatable()
+```
+en op basis van dit voorbeeld vinden we de volgende coefficienten:
 
+```{r}
 (coefficients <- get_coefficients_loglinear(newdata = df_test))
+```
 
+en bijbehorend cluster id:
+
+```{r}
 (predicted_cluster <- predict_cluster(coefficients = coefficients, kmeansmodel = model_kmeans))
 ```
+
+Dit cluster id komt overeen met de situatie: Hoge begindruk, matige stijging.
+
+
+# Conclusies
+
+1. Op basis van de intercept en slope parameters van een mixed effect model dat we gefit hebben op het drukverloop per dag, zien we duidelijk **2 niet-overlappende clusters van 'goede' en 'slechte' dagen**:
+    - 'Goede' dagen: cluster van dagen met hoge begindruk (intercept) en matige stijging (slope)
+    - 'Slechte' dagen: cluster van dagen met lage begindruk en sterke stijging
+2. Mbv k-means clustering hebben we vervolgens automatisch bepaald **welke datapunten tot welk van beide clusters behoren**.
+3. Met de nieuw gedefinieerde functies `get_coefficients_loglinear` en `predict_cluster`, in combinatie met het voorgetrainde kmeans model (of beter gezegd hun cluster centers) kunnen we **voortaan automatisch bepalen of het drukverloop op een bepaalde dag het 'goede' of het 'slechte' patroon volgt**. Dit kan zelfs met onvolledige data van de betreffende dag, bijvoorbeeld op basis van een live feed.
